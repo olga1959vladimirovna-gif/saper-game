@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>САПЁР · Неоновая классика</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html { scroll-behavior: smooth; }
+  
+  body {
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px 15px;
+    background: #050a12; color: #c8e8f0; overflow-x: hidden;
+    background-image: radial-gradient(circle at 50% 0%, #112233 0%, #050a12 80%);
+  }
+  
+  /* --- Анимированный фон --- */
+  .bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .bg::before {
+    content: ""; position: absolute; inset: -50%;
+    background-image: linear-gradient(rgba(0,255,200,.05) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0,255,200,.05) 1px, transparent 1px);
+    background-size: 50px 50px; animation: gridMove 20s linear infinite;
+  }
+  @keyframes gridMove { 100% { transform: translate(50px, 50px); } }
+  .bg-mine {
+    position: absolute; font-size: 2.5rem; opacity: 0.15;
+    filter: drop-shadow(0 0 12px #00ffc3); animation: floatUp linear infinite;
+  }
+  @keyframes floatUp {
+    0% { transform: translateY(110vh) rotate(0deg) scale(0.8); opacity: 0; }
+    10% { opacity: 0.15; } 90% { opacity: 0.1; }
+    100% { transform: translateY(-20vh) rotate(360deg) scale(1.1); opacity: 0; }
+  }
+
+  /* --- Заголовок и кнопка вверху --- */
+  .header { position: relative; z-index: 2; text-align: center; margin-bottom: 20px; }
+  h1 {
+    font-size: 2.2rem; letter-spacing: 3px; text-transform: uppercase;
+    color: #fff; text-shadow: 0 0 10px #00ffc3, 0 0 20px #00ffc3, 0 0 40px #00ffc3;
+    margin-bottom: 15px;
+  }
+  .btn-rules {
+    display: inline-block; padding: 10px 25px; background: rgba(0,255,200,0.1);
+    border: 2px solid #00ffc3; color: #00ffc3; border-radius: 30px;
+    font-weight: bold; cursor: pointer; text-decoration: none; font-size: 1rem;
+    box-shadow: 0 0 15px rgba(0,255,200,0.3); transition: 0.3s;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .btn-rules:hover { background: rgba(0,255,200,0.2); box-shadow: 0 0 25px rgba(0,255,200,0.6); transform: translateY(-2px); }
+
+  /* --- Игровое поле --- */
+  .game-wrap {
+    position: relative; z-index: 2; width: 100%; max-width: 450px;
+    background: rgba(12, 18, 34, 0.85); border-radius: 20px; padding: 20px;
+    border: 1px solid rgba(0, 255, 200, 0.3);
+    box-shadow: 0 20px 40px -10px #000, inset 0 0 20px rgba(0,255,200,0.05);
+    backdrop-filter: blur(10px);
+  }
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .info {
+    display: flex; gap: 20px; background: rgba(0,20,30,0.8); padding: 10px 20px;
+    border-radius: 30px; border: 1px solid rgba(0,255,200,0.2);
+    font-size: 1.5rem; font-weight: bold; color: #b5fff0;
+    text-shadow: 0 0 10px #00ffc3;
+  }
+  .btn-reset {
+    background: rgba(0,255,200,0.1); border: 2px solid #00ffc3; color: #00ffc3;
+    width: 50px; height: 50px; border-radius: 50%; font-size: 1.8rem;
+    cursor: pointer; display: flex; justify-content: center; align-items: center;
+    transition: 0.3s; box-shadow: 0 0 15px rgba(0,255,200,0.4);
+  }
+  .btn-reset:hover { background: rgba(0,255,200,0.2); transform: rotate(30deg); }
+
+  /* --- Сетка и клетки --- */
+  .board { display: grid; gap: 4px; justify-content: center; margin: 0 auto; }
+  .cell {
+    width: 34px; height: 34px; border-radius: 8px; background: #16202e;
+    border: 1px solid #2a3b52; box-shadow: inset 0 -3px 0 #0b111a;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.1s;
+  }
+  .cell:hover:not(.revealed):not(.flagged) { background: #1f3047; border-color: #3f6a8c; transform: scale(1.05); }
+  .cell:active:not(.revealed):not(.flagged) { transform: scale(0.95); }
+  .cell.revealed { background: #0b141f; border-color: #1a2f42; box-shadow: none; cursor: default; transform: none; }
+  .cell.mine { background: #3a0a15; border-color: #ff1e4d; color: #ff4d6d; font-size: 1.4rem; text-shadow: 0 0 10px #ff1e4d; }
+  .cell.flagged { background: #2a1a1e; border-color: #ff4d6d; color: #ff4d6d; text-shadow: 0 0 10px #ff4d6d; }
+  
+  /* Цвета цифр */
+  .cell[data-v="1"] { color: #6ee7ff; text-shadow: 0 0 10px #6ee7ff; }
+  .cell[data-v="2"] { color: #a7ff8b; text-shadow: 0 0 10px #a7ff8b; }
+  .cell[data-v="3"] { color: #ffb86b; text-shadow: 0 0 10px #ffb86b; }
+  .cell[data-v="4"] { color: #ff7b9c; text-shadow: 0 0 10px #ff7b9c; }
+  .cell[data-v="5"] { color: #d9a0ff; text-shadow: 0 0 10px #d9a0ff; }
+  .cell[data-v="6"] { color: #7affe0; text-shadow: 0 0 10px #7affe0; }
+  .cell[data-v="7"] { color: #ff8ad4; text-shadow: 0 0 10px #ff8ad4; }
+  .cell[data-v="8"] { color: #b0b0ff; text-shadow: 0 0 10px #b0b0ff; }
+
+  .msg { text-align: center; margin-top: 20px; font-size: 1.3rem; font-weight: bold; color: #00ffc3; text-shadow: 0 0 15px #00ffc3; min-height: 30px; }
+
+  /* --- Правила --- */
+  .rules {
+    position: relative; z-index: 2; max-width: 450px; width: 100%;
+    margin-top: 40px; margin-bottom: 40px; background: rgba(12, 18, 34, 0.9);
+    padding: 30px; border-radius: 20px; border: 1px solid rgba(0,255,200,0.3);
+    line-height: 1.6; box-shadow: 0 20px 40px -10px #000;
+    scroll-margin-top: 20px;
+  }
+  .rules h2 { color: #00ffc3; margin-bottom: 20px; text-align: center; font-size: 1.8rem; text-shadow: 0 0 10px rgba(0,255,200,0.5); }
+  .rules h3 { color: #a0f0ff; margin: 20px 0 10px; font-size: 1.2rem; }
+  .rules ul { padding-left: 20px; margin-bottom: 15px; }
+  .rules li { margin-bottom: 10px; }
+  .rules b { color: #00ffc3; }
+
+  @media (min-width: 500px) {
+    .cell { width: 42px; height: 42px; font-size: 1.5rem; border-radius: 10px; }
+    .board { gap: 6px; }
+    .game-wrap { padding: 30px; }
+    h1 { font-size: 2.8rem; }
+  }
+  @media (max-width: 360px) {
+    .cell { width: 28px; height: 28px; font-size: 1rem; border-radius: 6px; }
+    .board { gap: 3px; }
+    .info { padding: 5px 10px; font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg" id="bg"></div>
+
+<div class="header">
+  <h1>Сапёр</h1>
+  <a href="#rules" class="btn-rules">📖 Правила игры</a>
+</div>
+
+<div class="game-wrap">
+  <div class="top-bar">
+    <div class="info">
+      <span>💣 <span id="mines">10</span></span>
+      <span>⏱️ <span id="timer">000</span></span>
+    </div>
+    <button class="btn-reset" id="reset">↻</button>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="msg" id="msg"></div>
+</div>
+
+<div class="rules" id="rules">
+  <h2>🎮 Как играть в Сапёра</h2>
+  <p>На поле спрятаны мины 💣. Твоя цель — открыть все безопасные клетки и не взорваться!</p>
+  
+  <h3>Что делать?</h3>
+  <ul>
+    <li><b>Левый клик</b> (или тап на телефоне) — открыть клетку.</li>
+    <li>Если открыл мину — <b>БУМ!</b> 💥 Игра окончена.</li>
+    <li><b>Цифра</b> показывает, сколько мин находится в соседних 8 клетках вокруг неё.</li>
+    <li><b>Правый клик</b> (или долгое нажатие на телефоне) — поставить флажок ⚑, если ты думаешь, что там мина.</li>
+  </ul>
+
+  <h3>Как победить?</h3>
+  <ul>
+    <li>Открой все клетки, где <b>нет мин</b>.</li>
+  </ul>
+  
+  <h3>Хитрости</h3>
+  <ul>
+    <li>Первый клик всегда безопасен!</li>
+    <li>Если видишь цифру 1 — рядом только одна мина. Если 2 — две.</li>
+    <li>Кнопка ↻ вверху справа начинает игру заново.</li>
+  </ul>
+</div>
+
+<script>
+(function() {
+  const ROWS = 10, COLS = 10, MINES = 10;
+  let board = [], isGameOver = false, isWin = false, minesPlaced = false, flags = 0, timerId = null, secs = 0;
+
+  const boardEl = document.getElementById('board');
+  const minesEl = document.getElementById('mines');
+  const timerEl = document.getElementById('timer');
+  const msgEl = document.getElementById('msg');
+  const resetBtn = document.getElementById('reset');
+
+  // Генерация фона
+  const bg = document.getElementById('bg');
+  for (let i = 0; i < 10; i++) {
+    let m = document.createElement('div');
+    m.className = 'bg-mine';
+    m.textContent = '💣';
+    m.style.left = Math.random() * 100 + '%';
+    m.style.animationDuration = (12 + Math.random() * 10) + 's';
+    m.style.animationDelay = (-Math.random() * 20) + 's';
+    bg.appendChild(m);
+  }
+
+  function updateUI() { minesEl.textContent = Math.max(0, MINES - flags); }
+  
+  function startTimer() {
+    if (timerId) return;
+    timerId = setInterval(() => {
+      if (!isGameOver && !isWin) { secs++; timerEl.textContent = String(secs).padStart(3, '0'); }
+    }, 1000);
+  }
+  
+  function stopTimer() { clearInterval(timerId); timerId = null; }
+
+  function createBoard() {
+    board = [];
+    for (let r = 0; r < ROWS; r++) {
+      let row = [];
+      for (let c = 0; c < COLS; c++) row.push({ mine: false, rev: false, flag: false, n: 0 });
+      board.push(row);
+    }
+  }
+
+  function placeMines(safeR, safeC) {
+    let placed = 0;
+    while (placed < MINES) {
+      let r = Math.floor(Math.random() * ROWS);
+      let c = Math.floor(Math.random() * COLS);
+      if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue;
+      if (!board[r][c].mine) { board[r][c].mine = true; placed++; }
+    }
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (board[r][c].mine) continue;
+        let count = 0;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            let nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc].mine) count++;
+          }
+        }
+        board[r][c].n = count;
+      }
+    }
+    minesPlaced = true;
+  }
+
+  function reveal(r, c) {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+    let cell = board[r][c];
+    if (cell.rev || cell.flag || isGameOver || isWin) return;
+    cell.rev = true;
+    
+    if (cell.mine) {
+      isGameOver = true; stopTimer();
+      for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) if (board[i][j].mine) board[i][j].rev = true;
+      render(); msgEl.textContent = '💥 БУМ! ИГРА ОКОНЧЕНА 💥'; return;
+    }
+    
+    if (cell.n === 0) {
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        reveal(r + dr, c + dc);
+      }
+    }
+  }
+
+  function checkWin() {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (!board[r][c].mine && !board[r][c].rev) return false;
+    return true;
+  }
+
+  function render() {
+    boardEl.style.gridTemplateColumns = `repeat(${COLS}, auto)`;
+    boardEl.innerHTML = '';
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        let cell = board[r][c];
+        let div = document.createElement('div');
+        div.className = 'cell';
+        
+        if (cell.rev) {
+          div.classList.add('revealed');
+          if (cell.mine) { div.classList.add('mine'); div.textContent = '💣'; }
+          else if (cell.n > 0) { div.textContent = cell.n; div.dataset.v = cell.n; }
+        } else if (cell.flag) {
+          div.classList.add('flagged'); div.textContent = '⚑';
+        }
+
+        div.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (isGameOver || isWin || cell.flag || cell.rev) return;
+          if (!minesPlaced) { placeMines(r, c); startTimer(); }
+          reveal(r, c);
+          if (!isGameOver && checkWin()) {
+            isWin = true; stopTimer();
+            for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) if (board[i][j].mine) board[i][j].flag = true;
+            flags = MINES; updateUI(); render(); msgEl.textContent = '✨ ПОБЕДА! ✨'; return;
+          }
+          render(); if (!isGameOver) updateUI();
+        });
+
+        div.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          if (isGameOver || isWin || cell.rev) return;
+          cell.flag = !cell.flag; flags += cell.flag ? 1 : -1;
+          updateUI(); render();
+        });
+
+        let touchTimer = null;
+        div.addEventListener('touchstart', (e) => {
+          if (isGameOver || isWin || cell.flag || cell.rev) return;
+          touchTimer = setTimeout(() => {
+            cell.flag = !cell.flag; flags += cell.flag ? 1 : -1;
+            updateUI(); render(); touchTimer = null;
+            if (navigator.vibrate) navigator.vibrate(50);
+          }, 400);
+        }, {passive: true});
+
+        div.addEventListener('touchend', (e) => {
+          if (touchTimer) {
+            clearTimeout(touchTimer); e.preventDefault();
+            if (!minesPlaced) { placeMines(r, c); startTimer(); }
+            reveal(r, c);
+            if (!isGameOver && checkWin()) {
+              isWin = true; stopTimer();
+              for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) if (board[i][j].mine) board[i][j].flag = true;
+              flags = MINES; updateUI(); render(); msgEl.textContent = '✨ ПОБЕДА! ✨'; return;
+            }
+            render(); if (!isGameOver) updateUI();
+          }
+        });
+        boardEl.appendChild(div);
+      }
+    }
+  }
+
+  function resetGame() {
+    stopTimer(); secs = 0; timerEl.textContent = '000';
+    isGameOver = false; isWin = false; minesPlaced = false; flags = 0;
+    msgEl.textContent = ''; updateUI(); createBoard(); render();
+  }
+
+  resetBtn.addEventListener('click', resetGame);
+  resetGame();
+})();
+</script>
+</body>
+</html>
